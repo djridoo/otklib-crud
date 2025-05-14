@@ -1,5 +1,7 @@
+import { orderBy } from 'lodash'
 import { Props } from '@otklib/core'
 import { RepositoryPort } from '../../core/ports/repository.port'
+import { RowsFilter } from '../../rowsFilter/rows-filter'
 
 export class InMemoryRepository implements RepositoryPort {
   public records: { [id: string]: Props } = {}
@@ -30,8 +32,9 @@ export class InMemoryRepository implements RepositoryPort {
     sortField?: string | null,
     sortDirection?: 'asc' | 'desc' | null,
   ): Promise<Props[]> {
-    // todo implement
-    return []
+    let rows = await RowsFilter.filter(Object.values(this.records), filter as Props)
+    rows = sortField && sortDirection ? orderBy(rows, [sortField], [sortDirection]) : rows
+    return page && limit ? rows.slice((page - 1) * limit, page * limit) : rows
   }
 
   private makeId(): string {

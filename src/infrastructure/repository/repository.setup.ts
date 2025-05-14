@@ -12,7 +12,7 @@ export class RepositorySetup {
   }
 
   public static setupPostgresRepository() {
-    di.set('repositoryPort', new PostgresRepository())
+    di.set('repositoryPort', new PostgresRepository('repository'))
   }
 
   public static setupDbConnector() {
