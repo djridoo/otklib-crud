@@ -14,9 +14,17 @@
     "prepare": "husky install"
   },
   "dependencies": {
-    "@otklib/core": "^1.0.2"
+    "@otklib/core": "^1.0.2",
+    "@otklib/db": "^1.0.2",
+    "@otklib/direct-server": "^1.0.2",
+    "@otklib/http-server": "^1.0.3",
+    "@otklib/in-memory": "^1.0.1",
+    "@otklib/postgres": "^1.0.1",
+    "dotenv": "^16.5.0",
+    "express": "4.21.1"
   },
   "devDependencies": {
+    "@types/express": "4.17.21",
     "@types/jest": "29.5.14",
     "@types/lodash": "4.17.13",
     "@types/node": "20.17.6",
