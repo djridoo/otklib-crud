@@ -13,10 +13,22 @@ export class CreateUseCase extends UseCase<CreateInput, CreateOutput> {
 
   public async execute(input: CreateInput): Promise<CreateOutput> {
     const user = await this.authorizerPort.getUser()
-    // const template = await this.templatePort.get()
-    // if (!template) return { id: '' }
-    // const entity = new RecordAccessibleEntity('', input, template)
-    // this.checkRecordAccess(entity, user.role, RecordAction.CREATE)
-    return this.repositoryPort.create(input)
+    const template = await this.templatePort.get()
+
+    if (!template) {
+      throw new Error('Template not found')
+    }
+
+    const accessRule = template.access.find((rule) => rule.role === user.role)
+
+    if (!accessRule || !accessRule.actions.includes(RecordAction.CREATE)) {
+      throw new Error('Access denied')
+    }
+
+    const createdEntity = await this.repositoryPort.create(input)
+
+    return {
+      id: createdEntity.id,
+    }
   }
 }
