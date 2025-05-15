@@ -1,6 +1,6 @@
 import { orderBy } from 'lodash'
 import { Props } from '@otklib/core'
-import { RepositoryPort } from '../../core/ports/repository.port'
+import { FindOptions, RepositoryPort } from '../../core/ports/repository.port'
 import { RowsFilter } from '../../rowsFilter/rows-filter'
 
 export class InMemoryRepository implements RepositoryPort {
@@ -25,13 +25,8 @@ export class InMemoryRepository implements RepositoryPort {
     return this.records[id]
   }
 
-  public async find(
-    filter?: Props | null,
-    page?: number | null,
-    limit?: number | null,
-    sortField?: string | null,
-    sortDirection?: 'asc' | 'desc' | null,
-  ): Promise<Props[]> {
+  public async find(options: FindOptions): Promise<Props[]> {
+    const { filter, page, limit, sortField, sortDirection } = options
     let rows = await RowsFilter.filter(Object.values(this.records), filter as Props)
     rows = sortField && sortDirection ? orderBy(rows, [sortField], [sortDirection]) : rows
     return page && limit ? rows.slice((page - 1) * limit, page * limit) : rows

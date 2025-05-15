@@ -1,7 +1,7 @@
 import { Props } from '@otklib/core'
 import { DbConnector, QueryAstBuilder } from '@otklib/db'
 import { PostgresInsertQuery, PostgresSelectQuery, PostgresUpdateQuery } from '@otklib/postgres'
-import { RepositoryPort } from '../../core/ports/repository.port'
+import { FindOptions, RepositoryPort } from '../../core/ports/repository.port'
 import { di } from '../../di'
 
 export class PostgresRepository implements RepositoryPort {
@@ -17,13 +17,8 @@ export class PostgresRepository implements RepositoryPort {
     return rows[0]
   }
 
-  public find(
-    filter?: Props | null,
-    page?: number | null,
-    limit?: number | null,
-    sortField?: string | null,
-    sortDirection?: 'asc' | 'desc' | null,
-  ): Promise<Props[]> {
+  public find(options: FindOptions): Promise<Props[]> {
+    const { filter, page, limit, sortField, sortDirection } = options
     const query = new PostgresSelectQuery(this.connector, this.table)
     const queryLimit = page && limit ? limit : null
     const queryOffset = page && limit ? (page - 1) * limit : null
