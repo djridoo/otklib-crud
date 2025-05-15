@@ -5,43 +5,41 @@ import { RepositoryPort } from '../../core/ports/repository.port'
 import { di } from '../../di'
 
 export class PostgresRepository implements RepositoryPort {
-  private readonly values: string
+  private readonly table: string
 
-  constructor(values: string) {
-    this.values = values
+  constructor(table: string) {
+    this.table = table
   }
 
   public async create(value: Props): Promise<Props> {
-    const query = new PostgresInsertQuery(this.connector, this.values, true)
+    const query = new PostgresInsertQuery(this.connector, this.table, true)
     const rows = await query.execute({ ...value })
-    return { ...rows[0] } as unknown as Props
+    return rows[0]
   }
 
-  public async find(
+  public find(
     filter?: Props | null,
     page?: number | null,
     limit?: number | null,
     sortField?: string | null,
     sortDirection?: 'asc' | 'desc' | null,
   ): Promise<Props[]> {
-    const query = new PostgresSelectQuery(this.connector, this.values)
+    const query = new PostgresSelectQuery(this.connector, this.table)
     const queryLimit = page && limit ? limit : null
     const queryOffset = page && limit ? (page - 1) * limit : null
-    return query.execute('*', QueryAstBuilder.build(filter as Props), queryLimit, queryOffset, sortField, sortDirection) as unknown as Promise<
-      Props[]
-    >
+    return query.execute('*', QueryAstBuilder.build(filter as Props), queryLimit, queryOffset, sortField, sortDirection)
   }
 
   public async get(id: string): Promise<Props | null> {
-    const query = new PostgresSelectQuery(this.connector, this.values)
+    const query = new PostgresSelectQuery(this.connector, this.table)
     const condition = QueryAstBuilder.build({ id })
-    const result = (await query.execute('*', condition)) as Props[]
+    const result = await query.execute('*', condition)
 
     return result.length > 0 ? result[0] : null
   }
 
   public async update(id: string, data: Props): Promise<Props> {
-    const query = new PostgresUpdateQuery(this.connector, this.values, true)
+    const query = new PostgresUpdateQuery(this.connector, this.table, true)
     const condition = QueryAstBuilder.build({ id })
     const result = (await query.execute(data, condition)) as Props[]
 
