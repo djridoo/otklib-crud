@@ -1,5 +1,5 @@
-import { AccessibleFieldTemplate, AccessibleTemplate, ValidFieldTemplate } from '@otklib/core'
+import { AccessibleTemplate, FieldTemplate } from '@otklib/core'
 
 export interface TemplatePort {
-  get(id: string): Promise<AccessibleTemplate<AccessibleFieldTemplate & ValidFieldTemplate>>
+  get(): Promise<AccessibleTemplate<FieldTemplate>>
 }
