@@ -1,8 +1,8 @@
-import { Props } from '@otklib/core'
+import { DI, Props } from '@otklib/core'
 import { DbConnector, QueryAstBuilder } from '@otklib/db'
 import { PostgresInsertQuery, PostgresSelectQuery, PostgresUpdateQuery } from '@otklib/postgres'
 import { FindOptions, RepositoryPort } from '../../core/ports/repository.port'
-import { di } from '../../di'
+import { CrudDi } from '../../crud.di'
 
 export class PostgresRepository implements RepositoryPort {
   private readonly table: string
@@ -42,6 +42,7 @@ export class PostgresRepository implements RepositoryPort {
   }
 
   private get connector(): DbConnector {
+    const di = new DI<CrudDi>()
     return di.get('dbConnector')
   }
 }

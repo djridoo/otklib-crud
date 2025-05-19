@@ -1,71 +1,51 @@
-import { AccessibleTemplate, FieldTemplate, RecordAction, UseCase } from '@otklib/core'
+import { DI, FieldsAccessibleValueObject, Props, RecordAccessibleValueObject, RecordAction, UseCase, ValidValueObject } from '@otklib/core'
 import { UpdateInput } from './interfaces/update.input'
 import { UpdateOutput } from './interfaces/update.output'
 import { AuthorizerPort } from '../../ports/authorizer.port'
 import { RepositoryPort } from '../../ports/repository.port'
 import { TemplatePort } from '../../ports/template.port'
-import { di } from '../../../di'
+import { CrudDi } from '../../../crud.di'
 
 export class UpdateUseCase extends UseCase<UpdateInput, UpdateOutput> {
-  private authorizerPort: AuthorizerPort = di.get('authorizerPort')
-  private repositoryPort: RepositoryPort = di.get('repositoryPort')
-  private templatePort: TemplatePort = di.get('templatePort')
+  private authorizerPort: AuthorizerPort
+  private repositoryPort: RepositoryPort
+  private templatePort: TemplatePort
+
+  constructor(
+    di: DI<CrudDi>,
+    private options: Props,
+  ) {
+    super()
+
+    this.authorizerPort = di.get('authorizerPort')
+    this.repositoryPort = di.get('repositoryPort')
+    this.templatePort = di.get('templatePort')
+  }
 
   public async execute(input: UpdateInput): Promise<UpdateOutput> {
     const user = await this.authorizerPort.getUser()
-    const template = await this.templatePort.get()
+    const template = await this.templatePort.get(this.options.updateTemplate)
 
     if (!template) {
       throw new Error('Template not found')
     }
 
-    if (!(await this.hasAccess(template, user.role as string))) {
-      throw new Error('Access denied')
+    const existing = await this.repositoryPort.get(input.id)
+    if (!existing) {
+      throw new Error('Record not found')
     }
 
-    this.validateData(template.fields, input.data)
+    const flatInput: Props = { ...existing, ...input.data, id: input.id }
+
+    const recordAccessibleEntity = new RecordAccessibleValueObject(flatInput, template)
+    this.checkRecordAccess(recordAccessibleEntity, user.role as string, RecordAction.UPDATE)
+
+    const fieldsAccessibleEntity = new FieldsAccessibleValueObject(flatInput, template)
+    this.checkFieldsAccess(fieldsAccessibleEntity, user.role as string, RecordAction.UPDATE)
+
+    const validEntity = new ValidValueObject(flatInput, template)
+    this.validate(validEntity)
 
     return this.repositoryPort.update(input.id, input.data)
-  }
-
-  private async hasAccess(template: AccessibleTemplate<FieldTemplate>, role: string): Promise<boolean> {
-    const rule = template.access.find((r) => r.role === role)
-    return !!rule && rule.actions.includes(RecordAction.UPDATE)
-  }
-
-  private validateData(fields: FieldTemplate[], data: Record<string, any>): void {
-    const fieldMap = Object.fromEntries(fields.map((f) => [f.name, f]))
-
-    // eslint-disable-next-line guard-for-in
-    for (const key in data) {
-      if (!fieldMap[key]) {
-        throw new Error(`Field "${key}" is not defined in the template`)
-      }
-
-      const field = fieldMap[key]
-      const value = data[key]
-
-      if (value === undefined) continue
-
-      switch (field.type) {
-        case 'text':
-          if (typeof value !== 'string') {
-            throw new Error(`Field "${key}" must be a string`)
-          }
-          break
-        case 'number':
-          if (typeof value !== 'number') {
-            throw new Error(`Field "${key}" must be a number`)
-          }
-          break
-        case 'boolean':
-          if (typeof value !== 'boolean') {
-            throw new Error(`Field "${key}" must be a boolean`)
-          }
-          break
-        default:
-          break
-      }
-    }
   }
 }

@@ -1,10 +1,13 @@
+import { DI } from '@otklib/core'
 import { config } from 'dotenv'
 import { DbConnector } from '@otklib/db'
 import { PostgresDbConnector } from '@otklib/postgres'
-import { di } from '../../di'
 
+import { CrudDi } from '../../crud.di'
 import { InMemoryRepository } from './in-memory.repository'
 import { PostgresRepository } from './postgres.repository'
+
+const di = new DI<CrudDi>()
 
 export class RepositorySetup {
   public static setupMemoryRepository() {

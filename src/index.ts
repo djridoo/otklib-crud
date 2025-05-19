@@ -1,1 +1,1 @@
-export * from './di'
+export * from './crud.di'

@@ -1,10 +1,10 @@
-import { AccessibleTemplate, FieldTemplate } from '@otklib/core'
+import { AccessibleFieldTemplate, AccessibleTemplate, FieldTemplate, PropValue, ValidFieldTemplate } from '@otklib/core'
 import { TemplatePort } from '../../src/core/ports/template.port'
 
 export class TemplateStub implements TemplatePort {
-  public template: AccessibleTemplate<FieldTemplate>
+  public template: Promise<AccessibleTemplate<FieldTemplate & ValidFieldTemplate & AccessibleFieldTemplate>>
 
-  public async get(): Promise<AccessibleTemplate<FieldTemplate>> {
+  public get(templateName: PropValue): Promise<AccessibleTemplate<FieldTemplate & ValidFieldTemplate & AccessibleFieldTemplate>> {
     return this.template
   }
 }

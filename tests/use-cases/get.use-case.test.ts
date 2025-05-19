@@ -1,16 +1,15 @@
-import { AccessException, NotFoundException, RecordAction } from '@otklib/core'
+import { AccessException, DI, NotFoundException, RecordAction } from '@otklib/core'
 import { GetUseCase } from '../../src/core/use-cases/get/get.use-case'
 import { AuthorizerStub } from '../stub/authorizer.stub'
 import { TemplateStub } from '../stub/template.stub'
 import { InMemoryRepository } from '../../src/infrastructure/repository/in-memory.repository'
-import { di } from '../../src'
-import { template } from '../assets/template'
 
 describe('GetUseCase', () => {
   let useCase: GetUseCase
   let authorizerPort: AuthorizerStub
   let templatePort: TemplateStub
   let repositoryPort: InMemoryRepository
+  let di: DI<any>
 
   const mockAdmin = {
     id: '1',
@@ -30,20 +29,23 @@ describe('GetUseCase', () => {
     templatePort = new TemplateStub()
     repositoryPort = new InMemoryRepository()
 
+    di = new DI()
     di.set('authorizerPort', authorizerPort)
     di.set('templatePort', templatePort)
     di.set('repositoryPort', repositoryPort)
 
-    templatePort.template = template
-
-    useCase = new GetUseCase()
+    useCase = new GetUseCase(di, {
+      getTemplate: 'test',
+    })
   })
 
-  it('должен успешно получить запись при наличии прав на чтение', async () => {
+  it('should successfully get the entry if you have read permissions', async () => {
     authorizerPort.user.role = 'user'
-    templatePort.template = {
+
+    templatePort.template = Promise.resolve({
       name: 'test',
       title: 'test-title',
+      fields: [],
       access: [
         {
           role: 'user',
@@ -51,55 +53,32 @@ describe('GetUseCase', () => {
           condition: {},
         },
       ],
-      fields: [],
-    }
+    })
 
     const createdRecord = await repositoryPort.create(mockRecord)
     const result = await useCase.execute({ id: createdRecord.id as string })
     expect(result).toEqual(createdRecord)
   })
 
-  it('должен выбросить ошибку при отсутствии аутентификации пользователя', async () => {
-    authorizerPort.user = {
-      id: '',
-      role: '',
-      name: '',
-      customer: null,
-      features: {},
-    }
+  it('should throw an error if user is not authenticated', async () => {
+    authorizerPort.user = null as any
+
     await expect(useCase.execute({ id: 'record1' })).rejects.toThrow(AccessException)
   })
 
-  it('должен выбросить ошибку при отсутствии шаблона', async () => {
-    templatePort.template = null as any
+  it('should throw an error if the template is missing', async () => {
     authorizerPort.user.role = 'user'
+    templatePort.template = Promise.resolve(null as any)
 
-    await expect(useCase.execute({ id: 'record1' })).rejects.toThrow(NotFoundException)
+    await expect(useCase.execute({ id: 'record1' })).rejects.toThrow('Template not found')
   })
 
-  it('должен выбросить ошибку при отсутствии прав на чтение', async () => {
+  it('should throw an error if you dont have read permissions', async () => {
     authorizerPort.user.role = 'guest'
-    templatePort.template = {
-      name: 'test',
-      title: '',
-      access: [
-        {
-          role: 'admin',
-          actions: [RecordAction.READ],
-          condition: {},
-        },
-      ],
-      fields: [],
-    }
-
-    await expect(useCase.execute({ id: 'record1' })).rejects.toThrow(AccessException)
-  })
-
-  it('должен выбросить ошибку при отсутствии записи', async () => {
-    authorizerPort.user.role = 'admin'
-    templatePort.template = {
+    templatePort.template = Promise.resolve({
       name: 'test',
       title: 'test-title',
+      fields: [],
       access: [
         {
           role: 'admin',
@@ -107,17 +86,35 @@ describe('GetUseCase', () => {
           condition: {},
         },
       ],
+    })
+
+    await expect(useCase.execute({ id: 'record1' })).rejects.toThrow(AccessException)
+  })
+
+  it('should throw an error if there is no entry', async () => {
+    authorizerPort.user.role = 'admin'
+    templatePort.template = Promise.resolve({
+      name: 'test',
+      title: 'test-title',
       fields: [],
-    }
+      access: [
+        {
+          role: 'admin',
+          actions: [RecordAction.READ],
+          condition: {},
+        },
+      ],
+    })
 
     await expect(useCase.execute({ id: 'non-existent-id' })).rejects.toThrow(NotFoundException)
   })
 
-  it('должен позволить администратору прочитать запись при наличии прав', async () => {
+  it('should allow the administrator to read the entry if they have permission', async () => {
     authorizerPort.user.role = 'admin'
-    templatePort.template = {
+    templatePort.template = Promise.resolve({
       name: 'test',
       title: 'test-title',
+      fields: [],
       access: [
         {
           role: 'admin',
@@ -125,8 +122,7 @@ describe('GetUseCase', () => {
           condition: {},
         },
       ],
-      fields: [],
-    }
+    })
 
     const createdAdmin = await repositoryPort.create(mockAdmin)
     const result = await useCase.execute({ id: createdAdmin.id as string })

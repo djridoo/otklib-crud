@@ -1,47 +1,84 @@
-import { RecordAction } from '@otklib/core'
+import { DI, RecordAction } from '@otklib/core'
 import { UpdateUseCase } from '../../src/core/use-cases/update/update.use-case'
 import { AuthorizerStub } from '../stub/authorizer.stub'
 import { TemplateStub } from '../stub/template.stub'
 import { InMemoryRepository } from '../../src/infrastructure/repository/in-memory.repository'
-import { di } from '../../src'
 
 describe('UpdateUseCase', () => {
   let useCase: UpdateUseCase
   let authorizerPort: AuthorizerStub
   let templatePort: TemplateStub
   let repositoryPort: InMemoryRepository
+  let di: DI<any>
 
-  beforeEach(() => {
+  beforeEach(async () => {
     authorizerPort = new AuthorizerStub()
     templatePort = new TemplateStub()
     repositoryPort = new InMemoryRepository()
 
+    di = new DI()
     di.set('authorizerPort', authorizerPort)
     di.set('templatePort', templatePort)
     di.set('repositoryPort', repositoryPort)
 
-    repositoryPort.create({ id: '1', name: 'Company A', employees: 20 })
+    await repositoryPort.create({ id: '1', name: 'Company A', employees: 20 })
 
-    useCase = new UpdateUseCase()
+    useCase = new UpdateUseCase(di, {
+      updateTemplate: 'company',
+    })
   })
 
-  it('должен успешно обновить запись при наличии прав', async () => {
+  it('successfully updates a record if you have permission', async () => {
     authorizerPort.user.role = 'admin'
-    templatePort.template = {
+
+    templatePort.template = Promise.resolve({
       name: 'company',
       title: 'Company Template',
       fields: [
         {
+          name: 'id',
+          type: 'text',
+          title: 'ID',
+          required: true,
+          example: '',
+          validation: [],
+          access: [
+            {
+              role: 'admin',
+              actions: [RecordAction.UPDATE],
+              condition: {},
+            },
+          ],
+        },
+        {
           name: 'name',
           type: 'text',
-          title: 'Название компании',
+          title: 'Название',
+          required: true,
           example: '',
+          validation: [],
+          access: [
+            {
+              role: 'admin',
+              actions: [RecordAction.UPDATE],
+              condition: {},
+            },
+          ],
         },
         {
           name: 'employees',
           type: 'number',
-          title: 'Число сотрудников',
+          title: 'Сотрудники',
+          required: false,
           example: '',
+          validation: [],
+          access: [
+            {
+              role: 'admin',
+              actions: [RecordAction.UPDATE],
+              condition: {},
+            },
+          ],
         },
       ],
       access: [
@@ -51,7 +88,7 @@ describe('UpdateUseCase', () => {
           condition: {},
         },
       ],
-    }
+    })
 
     const input = {
       id: '1',
@@ -61,37 +98,79 @@ describe('UpdateUseCase', () => {
     const output = await useCase.execute(input)
 
     expect(output.id).toBe('1')
-    expect(output.name).toBe('Updated Company Name')
-    expect(output.employees).toBe(30)
 
-    const updatedRecord = await repositoryPort.get('1')
-    expect(updatedRecord?.name).toBe('Updated Company Name')
-    expect(updatedRecord?.employees).toBe(30)
+    const updated = await repositoryPort.get('1')
+    expect(updated?.name).toBe('Updated Company Name')
+    expect(updated?.employees).toBe(30)
   })
 
-  it('должен обновить только указанные поля, оставив остальные без изменений', async () => {
+  it('updates only the specified fields, leaves the rest alone', async () => {
     authorizerPort.user.role = 'editor'
-    templatePort.template = {
+    await repositoryPort.create({ id: '2', name: 'Old Name', employees: 20, active: true })
+
+    templatePort.template = Promise.resolve({
       name: 'company',
       title: 'Company Template',
       fields: [
         {
+          name: 'id',
+          type: 'text',
+          title: 'ID',
+          required: true,
+          example: '',
+          validation: [],
+          access: [
+            {
+              role: 'editor',
+              actions: [RecordAction.UPDATE],
+              condition: {},
+            },
+          ],
+        },
+        {
           name: 'name',
           type: 'text',
-          title: 'Название компании',
+          title: 'Название',
+          required: false,
           example: '',
+          validation: [],
+          access: [
+            {
+              role: 'editor',
+              actions: [RecordAction.UPDATE],
+              condition: {},
+            },
+          ],
         },
         {
           name: 'employees',
           type: 'number',
-          title: 'Число сотрудников',
+          title: 'Сотрудники',
+          required: false,
           example: '',
+          validation: [],
+          access: [
+            {
+              role: 'editor',
+              actions: [RecordAction.UPDATE],
+              condition: {},
+            },
+          ],
         },
         {
           name: 'active',
           type: 'boolean',
-          title: 'Активный статус',
+          title: 'Статус',
+          required: false,
           example: '',
+          validation: [],
+          access: [
+            {
+              role: 'editor',
+              actions: [RecordAction.UPDATE],
+              condition: {},
+            },
+          ],
         },
       ],
       access: [
@@ -101,9 +180,7 @@ describe('UpdateUseCase', () => {
           condition: {},
         },
       ],
-    }
-
-    await repositoryPort.create({ id: '2', name: 'Old Name', employees: 20 })
+    })
 
     const input = {
       id: '2',
@@ -115,13 +192,14 @@ describe('UpdateUseCase', () => {
     expect(output.id).toBe('2')
     expect(output.name).toBe('New Name Only')
     expect(output.employees).toBe(20)
+    expect(output.active).toBe(true)
   })
 
-  it('должен выбросить ошибку, если у пользователя нет прав на UPDATE', async () => {
+  it('throws an error if there is no permission to UPDATE', async () => {
     authorizerPort.user.role = 'guest'
-    templatePort.template = {
+    templatePort.template = Promise.resolve({
       name: 'company',
-      title: 'Company Template',
+      title: '',
       fields: [],
       access: [
         {
@@ -130,19 +208,19 @@ describe('UpdateUseCase', () => {
           condition: {},
         },
       ],
-    }
+    })
 
     const input = {
       id: '1',
       data: { name: 'Attempted Update' },
     }
 
-    await expect(useCase.execute(input)).rejects.toThrow('Access denied')
+    await expect(useCase.execute(input)).rejects.toThrow('Forbidden')
   })
 
-  it('должен выбросить ошибку, если шаблон не найден', async () => {
+  it('throws an error if the pattern is not found', async () => {
     authorizerPort.user.role = 'admin'
-    templatePort.template = null as any
+    templatePort.template = Promise.resolve(null as any)
 
     const input = {
       id: '1',
@@ -152,17 +230,26 @@ describe('UpdateUseCase', () => {
     await expect(useCase.execute(input)).rejects.toThrow('Template not found')
   })
 
-  it('должен выбросить ошибку, если передано поле, которого нет в шаблоне', async () => {
+  it('throws an error if a field is passed that is not in the template', async () => {
     authorizerPort.user.role = 'admin'
-    templatePort.template = {
+    templatePort.template = Promise.resolve({
       name: 'company',
       title: 'Company Template',
       fields: [
         {
           name: 'name',
           type: 'text',
-          title: 'Название компании',
+          title: 'Название',
+          required: true,
           example: '',
+          validation: [],
+          access: [
+            {
+              role: 'admin',
+              actions: [RecordAction.UPDATE],
+              condition: {},
+            },
+          ],
         },
       ],
       access: [
@@ -172,27 +259,36 @@ describe('UpdateUseCase', () => {
           condition: {},
         },
       ],
-    }
+    })
 
     const input = {
       id: '1',
-      data: { name: 'Test', invalidField: 'value' },
+      data: { name: 'Valid', invalidField: 'value' },
     }
 
-    await expect(useCase.execute(input)).rejects.toThrow(`Field "invalidField" is not defined in the template`)
+    await expect(useCase.execute(input)).rejects.toThrow(`Forbidden`)
   })
 
-  it('должен выбросить ошибку, если тип данных не соответствует шаблону', async () => {
+  it('throws an error if the data type does not match the pattern', async () => {
     authorizerPort.user.role = 'admin'
-    templatePort.template = {
+    templatePort.template = Promise.resolve({
       name: 'company',
       title: 'Company Template',
       fields: [
         {
           name: 'employees',
           type: 'number',
-          title: 'Число сотрудников',
+          title: 'Сотрудники',
+          required: true,
           example: '',
+          validation: [],
+          access: [
+            {
+              role: 'admin',
+              actions: [RecordAction.UPDATE],
+              condition: {},
+            },
+          ],
         },
       ],
       access: [
@@ -202,13 +298,13 @@ describe('UpdateUseCase', () => {
           condition: {},
         },
       ],
-    }
+    })
 
     const input = {
       id: '1',
       data: { employees: 'not_a_number' },
     }
 
-    await expect(useCase.execute(input)).rejects.toThrow(`Field "employees" must be a number`)
+    await expect(useCase.execute(input)).rejects.toThrow(`Forbidden`)
   })
 })
